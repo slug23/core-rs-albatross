@@ -16,7 +16,7 @@ maintenance = { status = "experimental" }
 failure = "0.1"
 hex = { version = "0.4", optional = true }
 log = "0.4"
-parking_lot = "0.9"
+parking_lot = "0.10"
 rand = "0.7"
 tokio = { version = "0.2", features = ["rt-core"] }
 
