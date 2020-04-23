@@ -17,7 +17,7 @@ is-it-maintained-open-issues = { repository = "nimiq/core-rs" }
 maintenance = { status = "experimental" }
 
 [dependencies]
-base64 = "0.10"
+base64 = "0.12"
 beserial = { path = "../beserial", version = "0.1" }
 clear_on_drop = "0.2"
 failure = "0.1"
