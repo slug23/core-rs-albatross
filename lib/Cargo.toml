@@ -25,7 +25,7 @@ derive_builder = "0.9"
 directories = "2.0"
 enum-display-derive = "0.1"
 failure = "0.1"
-fern = { version = "0.5", features = ["colored"], optional = true }
+fern = { version = "0.6", features = ["colored"], optional = true }
 hex = "0.4"
 human-panic = { version = "1.0", optional = true }
 lazy_static = "1.4"
