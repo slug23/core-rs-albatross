@@ -6,6 +6,7 @@ use account::{Account, AccountType, PrunedAccount, Receipt, Receipts, ReceiptTyp
 use beserial::{Deserialize, Serialize};
 use hash::{Blake2bHash, Hash};
 use keys::Address;
+use transaction::Transaction;
 use nimiq_block::{BlockBody, BlockError};
 use primitives::coin::Coin;
 use primitives::networks::NetworkId;
@@ -14,6 +15,7 @@ use transaction::{TransactionError, TransactionFlags, TransactionFormat};
 const GENESIS_BODY: &str = "0000000000000000000000000000000000000000836c6f766520616920616d6f72206d6f68616262617420687562756e2063696e7461206c7975626f76206268616c616261736120616d6f7572206b61756e6120706927617261206c696562652065736871207570656e646f207072656d6120616d6f7265206b61747265736e616e20736172616e6720616e7075207072656d612079657500000000";
 const B169500_BODY: &str = "b403040ff02b4a9a4d10f8a4beff71750cd3aa7f324e696d6275732d393630656364346238313936303030303030323266386531313034663066663830323530373939373632320003010000ad8e224835e6cc0cadbcf500a49dae46f67697040224786862babbdb05e7c4430612135eb2a836812300000000000000000100000000000000000002961b2a0000a4010301daebe368963c60d22098a5e9f1ebcb8e54d0b7beca942a2a0a9d95391804fe8f94dc65fbd91fc9f5ed1d92dba86d2e59607774b13e27a556d92a56ade9808d32cebdb4e704995dd63f97429a827541d3c6253bc0c2f472c3341b538e2f4bc60800e930b6408b84cb3a7985c54e742c4a1af3110b865386144a0e1badd0bceefc162cecfda0761ce11e06a076c2882b2e21309602973a4443ba4d672b665d4f3f0100bf703dd4eb71e245cced26f014f40dc29f0f71e6bffce722a7ceecba1b71cb8d44d5c0727a1a08efd376cd005293e33236232fad0000000000004e2000000000000001180002961a2a8f6693b1eb1537aa8eec3f99898d91474e5cfa1de1c81a1ee9e0c04ba0205e310d65708ea6e5ed9e7953f4dce64e73392333a2b83d1b30d0df9eb74bcc68980900725323e8f226e7b9dac90331505844f83e45f28cc6f0534039f55c725536d1ec6573413bec835fa4fb54f4dfc3b273a9e8ecc95b000000000011c7020000000000000000000296192a53ddbfd2dd72a78a8b62699e0012585f4768f07e397ae3bb23d0cd379c0c12c9dbe0aca1ae8f005330bbb33c80ee1449229ad6d0e482a1fc8124233dd953600e000100ad8e224835e6cc0cadbcf500a49dae46f67697040200000000000000001b215589344cf570d36bec770825eae30b73213924786862babbdb05e7c4430612135eb2a836812303daebe368963c60d22098a5e9f1ebcb8e54d0b7beca942a2a0a9d95391804fe8f01000296350000000000000001";
 const B67795_BODY: &str = "6c4e6bc79391038a786ae11c0a8175c4a29c628125426565702d33627a4b4e587935613972797937793646374d7142726f70716e3730326a526b000200bf703dd4eb71e245cced26f014f40dc29f0f71e6bffce722a7ceecba1b71cb8d8a98acef6877ce586313cf7d46410f195c43fb5e00000000000061a80000000000000096000108d22ae2b8fe84104a06dd7c07987f08c77320704152a17f6c3d2a036fe20929794f5734f37fc9513335cea0844a47558748aae6603e1e4e3f3cc39480bcd4051e080c010000f3e6c569c694030b329b03b06ebbb8bb27586e1702bab04d1e40cc8e99fcc3caacc23e6ddd0a340d150000000000000000010000000000000000000108d32a0000a40103011fe43246c44f12e0d30d9bc3cf8de1bcf5740127e67caeea1459a9422802e42ac22aff463016308427f10d89913917eb9b39b2b422cfa51baa188fb33a61ffa4ca8ac9412bbc05153b1faa9fae61a31d6b6ce09cc9a04c671a31668189dd28d0004b4e09a27985ffe0de96e75dee210658990aed0a269ec8b256b8274d7d8ea4d290f25b7c95e88759c54a7e92a9c53ceba5417e434c79bf5f69e489f58da2420e000100f3e6c569c694030b329b03b06ebbb8bb27586e170200000000000000007d4731244bf358a96a2529488fe40135174cb8e5bab04d1e40cc8e99fcc3caacc23e6ddd0a340d15031fe43246c44f12e0d30d9bc3cf8de1bcf5740127e67caeea1459a9422802e42a01000108e80000000000000001";
+const TB43962_BODY: &str = "ae7a337e898aaef3bb45d2d7de45367d794dda6d0000010100001d3a0101c79e7fecaacccce2bd3a8539a74c3b07029c1bf7e087c83999387fcc925050b5186928c23b0000000000004c4b4000000000000000000000abba01000062037928c2574e26c90a2efece976897715e648fbda8435c644e976483ead317566100980aaa77f4b76f68664fce6a639ca2e3ccc5709d48799d8ddd6d442e7cbff6d1e799f8a376879c98ef9a594215ef426d33e96ae70c2b5cd895a8649be37e250d00011d3a0101c79e7fecaacccce2bd3a8539a74c3b07020000000000000000e304439319638de26511351aa7191f92e1d16bfbba0582ead7b9f14d44820bb902c9bde11d5d0e96033154e2ed471b0d93c120fe035d278ed95d93e02df67ef663996dac7c13085ded010000abae00000000004c4b40";
 
 #[test]
 fn it_can_deserialize_genesis_body() {
@@ -83,6 +85,37 @@ fn it_can_deserialize_b169500_body() {
     assert_eq!(receipt.address, Address::from("ad8e224835e6cc0cadbcf500a49dae46f6769704"));
     assert_eq!(receipt.account.balance(), Coin::ZERO);
     assert_eq!(receipt.account.account_type(), AccountType::HTLC);
+}
+
+#[test]
+fn it_can_deserialize_tb43962_body() {
+    let v: Vec<u8> = hex::decode(TB43962_BODY).unwrap();
+    let mut reader = &v[..];
+
+    // Miner Address
+    Address::deserialize(&mut reader).expect("Failed to deserialize Address");
+
+    // Extra Data
+    let extra_data_size: u8 = Deserialize::deserialize(&mut reader).expect("Failed to deserialize extraDataSize");
+    assert_eq!(extra_data_size, 0);
+
+    // Transactions
+    let transaction_size: u16 = Deserialize::deserialize(&mut reader).expect("Failed to deserialize transactionSize");
+    assert_eq!(transaction_size, 1);
+    Transaction::deserialize(&mut reader).expect("Failed to deserialize Transaction");
+
+    // Receipts (PrunedAccounts)
+    let receipt_size: u16 = Deserialize::deserialize(&mut reader).expect("Failed to deserialize receiptSize");
+    assert_eq!(receipt_size, 1);
+    let receipt_type: ReceiptType = Deserialize::deserialize(&mut reader).expect("Failed to deserialize ReceiptType");
+    assert_eq!(receipt_type, ReceiptType::PrunedAccount);
+    PrunedAccount::deserialize(&mut reader).expect("Failed to deserialize PrunedAccount");
+
+
+    // Complete BlockBody
+    let body: BlockBody = BlockBody::deserialize(&mut &v[..]).expect("Failed to deserialize BlockBody");
+    assert_eq!(body.transactions.len(), 1);
+    assert_eq!(body.receipts.len(), 1);
 }
 
 #[test]
