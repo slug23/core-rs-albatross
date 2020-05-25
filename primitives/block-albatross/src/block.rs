@@ -8,9 +8,9 @@ use primitives::networks::NetworkId;
 use transaction::Transaction;
 use vrf::VrfSeed;
 
-use crate::BlockError;
 use crate::macro_block::{MacroBlock, MacroHeader};
 use crate::micro_block::{MicroBlock, MicroHeader};
+use crate::{BlockError, MacroExtrinsics, MicroExtrinsics, MicroJustification, PbftProof};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[repr(u8)]
@@ -65,7 +65,7 @@ impl Block {
             // If the previous block was a macro block, this resets the view number
             Block::Macro(_) => 0,
             // Otherwise we are now at the view number of the previous block
-            Block::Micro(ref block) => block.header.view_number
+            Block::Micro(ref block) => block.header.view_number,
         }
     }
 
@@ -115,14 +115,14 @@ impl Block {
     pub fn transactions(&self) -> Option<&Vec<Transaction>> {
         match self {
             Block::Macro(_) => None,
-            Block::Micro(ref block) => block.extrinsics.as_ref().map(|ex| &ex.transactions)
+            Block::Micro(ref block) => block.extrinsics.as_ref().map(|ex| &ex.transactions),
         }
     }
 
     pub fn transactions_mut(&mut self) -> Option<&mut Vec<Transaction>> {
         match self {
             Block::Macro(_) => None,
-            Block::Micro(ref mut block) => block.extrinsics.as_mut().map(|ex| &mut ex.transactions)
+            Block::Micro(ref mut block) => block.extrinsics.as_mut().map(|ex| &mut ex.transactions),
         }
     }
 
@@ -205,10 +205,15 @@ impl Deserialize for Block {
 
 impl fmt::Display for Block {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "[#{}, view {}, type {:?}]", self.block_number(), self.view_number(), self.ty())
+        write!(
+            f,
+            "[#{}, view {}, type {:?}]",
+            self.block_number(),
+            self.view_number(),
+            self.ty()
+        )
     }
 }
-
 
 #[derive(Clone, Debug, Eq, PartialEq, SerializeContent)]
 pub enum BlockHeader {
@@ -255,7 +260,7 @@ impl BlockHeader {
     pub fn parent_hash(&self) -> &Blake2bHash {
         match self {
             BlockHeader::Macro(ref header) => &header.parent_hash,
-            BlockHeader::Micro(ref header) => &header.parent_hash
+            BlockHeader::Micro(ref header) => &header.parent_hash,
         }
     }
 
@@ -268,7 +273,7 @@ impl BlockHeader {
             // If the previous block was a macro block, this resets the view number
             BlockHeader::Macro(_) => 0,
             // Otherwise we are now at the view number of the previous block
-            BlockHeader::Micro(header) => header.view_number
+            BlockHeader::Micro(header) => header.view_number,
         }
     }
 }
@@ -323,6 +328,102 @@ impl Deserialize for BlockHeader {
             BlockType::Micro => BlockHeader::Micro(Deserialize::deserialize(reader)?),
         };
         Ok(header)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BlockJustification {
+    Micro(MicroJustification),
+    Macro(PbftProof),
+}
+
+impl BlockJustification {
+    pub fn ty(&self) -> BlockType {
+        match self {
+            BlockJustification::Macro(_) => BlockType::Macro,
+            BlockJustification::Micro(_) => BlockType::Micro,
+        }
+    }
+}
+
+impl Serialize for BlockJustification {
+    fn serialize<W: WriteBytesExt>(&self, writer: &mut W) -> Result<usize, SerializingError> {
+        let mut size = 0;
+        size += self.ty().serialize(writer)?;
+        size += match self {
+            BlockJustification::Macro(justification) => justification.serialize(writer)?,
+            BlockJustification::Micro(justification) => justification.serialize(writer)?,
+        };
+        Ok(size)
+    }
+
+    fn serialized_size(&self) -> usize {
+        let mut size = 0;
+        size += self.ty().serialized_size();
+        size += match self {
+            BlockJustification::Macro(justification) => justification.serialized_size(),
+            BlockJustification::Micro(justification) => justification.serialized_size(),
+        };
+        size
+    }
+}
+
+impl Deserialize for BlockJustification {
+    fn deserialize<R: ReadBytesExt>(reader: &mut R) -> Result<Self, SerializingError> {
+        let ty: BlockType = Deserialize::deserialize(reader)?;
+        let justification = match ty {
+            BlockType::Macro => BlockJustification::Macro(Deserialize::deserialize(reader)?),
+            BlockType::Micro => BlockJustification::Micro(Deserialize::deserialize(reader)?),
+        };
+        Ok(justification)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BlockExtrinsics {
+    Micro(MicroExtrinsics),
+    Macro(MacroExtrinsics),
+}
+
+impl BlockExtrinsics {
+    pub fn ty(&self) -> BlockType {
+        match self {
+            BlockExtrinsics::Macro(_) => BlockType::Macro,
+            BlockExtrinsics::Micro(_) => BlockType::Micro,
+        }
+    }
+}
+
+impl Serialize for BlockExtrinsics {
+    fn serialize<W: WriteBytesExt>(&self, writer: &mut W) -> Result<usize, SerializingError> {
+        let mut size = 0;
+        size += self.ty().serialize(writer)?;
+        size += match self {
+            BlockExtrinsics::Macro(extrinsics) => extrinsics.serialize(writer)?,
+            BlockExtrinsics::Micro(extrinsics) => extrinsics.serialize(writer)?,
+        };
+        Ok(size)
+    }
+
+    fn serialized_size(&self) -> usize {
+        let mut size = 0;
+        size += self.ty().serialized_size();
+        size += match self {
+            BlockExtrinsics::Macro(extrinsics) => extrinsics.serialized_size(),
+            BlockExtrinsics::Micro(extrinsics) => extrinsics.serialized_size(),
+        };
+        size
+    }
+}
+
+impl Deserialize for BlockExtrinsics {
+    fn deserialize<R: ReadBytesExt>(reader: &mut R) -> Result<Self, SerializingError> {
+        let ty: BlockType = Deserialize::deserialize(reader)?;
+        let extrinsics = match ty {
+            BlockType::Macro => BlockExtrinsics::Macro(Deserialize::deserialize(reader)?),
+            BlockType::Micro => BlockExtrinsics::Micro(Deserialize::deserialize(reader)?),
+        };
+        Ok(extrinsics)
     }
 }
 
