@@ -1,23 +1,29 @@
 use std::sync::Arc;
 
 use beserial::Deserialize;
-use nimiq_block_albatross::{Block, MacroBlock, PbftCommitMessage, PbftPrepareMessage, PbftProofBuilder, PbftProposal, SignedPbftCommitMessage, SignedPbftPrepareMessage, ViewChangeProof, SignedViewChange, ViewChange, ViewChangeProofBuilder, MacroExtrinsics};
+use nimiq_block_albatross::{
+    Block, MacroBlock, MacroExtrinsics, PbftCommitMessage, PbftPrepareMessage, PbftProofBuilder,
+    PbftProposal, SignedPbftCommitMessage, SignedPbftPrepareMessage, SignedViewChange, ViewChange,
+    ViewChangeProof, ViewChangeProofBuilder,
+};
 use nimiq_block_production_albatross::BlockProducer;
-use nimiq_blockchain_albatross::blockchain::{Blockchain, PushResult, PushError};
+use nimiq_blockchain_albatross::blockchain::{Blockchain, PushError, PushResult};
 use nimiq_blockchain_base::AbstractBlockchain;
 use nimiq_blockchain_base::Direction;
 use nimiq_bls::{KeyPair, SecretKey};
 use nimiq_database::volatile::VolatileEnvironment;
-use nimiq_hash::{Blake2bHash, Hash};
-use nimiq_network_primitives::{networks::NetworkId};
-use nimiq_primitives::policy;
 use nimiq_database::Environment;
+use nimiq_hash::{Blake2bHash, Hash};
+use nimiq_network_primitives::networks::NetworkId;
+use nimiq_primitives::policy;
 
-mod signed;
 mod macro_block_sync;
+mod signed;
 
 /// Secret key of validator. Tests run with `network-primitives/src/genesis/unit-albatross.toml`
-const SECRET_KEY: &'static str = "49ea68eb6b8afdf4ca4d4c0a0b295c76ca85225293693bc30e755476492b707f";
+const SECRET_KEY: &'static str = "8e44b45f308dae1e2d4390a0f96cea993960d4178550c62aeaba88e9e168d165\
+a8dadd6e1c553412d5c0f191e83ffc5a4b71bf45df6b5a125ec2c4a9a40643597cb6b5c3b588d55a363f1b56ac839eee4a6\
+ff848180500f2fc29d1c0595f0000";
 
 struct TemporaryBlockProducer {
     env: Environment,
@@ -30,12 +36,14 @@ impl TemporaryBlockProducer {
         let env = VolatileEnvironment::new(10).unwrap();
         let blockchain = Arc::new(Blockchain::new(env.clone(), NetworkId::UnitAlbatross).unwrap());
 
-        let keypair = KeyPair::from(SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap());
+        let keypair = KeyPair::from(
+            SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap(),
+        );
         let producer = BlockProducer::new_without_mempool(Arc::clone(&blockchain), keypair);
         TemporaryBlockProducer {
             env,
             blockchain,
-            producer
+            producer,
         }
     }
 
@@ -53,34 +61,54 @@ impl TemporaryBlockProducer {
         };
 
         let block = if policy::is_macro_block_at(height) {
-            let (proposal, extrinsics) = self.producer.next_macro_block_proposal(1565713920000 + height as u64 * 2000, 0u32, view_change_proof);
-            Block::Macro(TemporaryBlockProducer::finalize_macro_block(proposal, extrinsics))
+            let (proposal, extrinsics) = self.producer.next_macro_block_proposal(
+                1565713920000 + height as u64 * 2000,
+                0u32,
+                view_change_proof,
+            );
+            Block::Macro(TemporaryBlockProducer::finalize_macro_block(
+                proposal, extrinsics,
+            ))
         } else {
-            Block::Micro(self.producer.next_micro_block(vec![], 1565713920000 + height as u64 * 2000, view_number, extra_data, view_change_proof))
+            Block::Micro(self.producer.next_micro_block(
+                vec![],
+                1565713920000 + height as u64 * 2000,
+                view_number,
+                extra_data,
+                view_change_proof,
+            ))
         };
         assert_eq!(self.push(block.clone()), Ok(PushResult::Extended));
         block
     }
 
     fn finalize_macro_block(proposal: PbftProposal, extrinsics: MacroExtrinsics) -> MacroBlock {
-        let keypair = KeyPair::from(SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap());
+        let keypair = KeyPair::from(
+            SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap(),
+        );
 
         let block_hash = proposal.header.hash::<Blake2bHash>();
 
         // create signed prepare and commit
         let prepare = SignedPbftPrepareMessage::from_message(
-            PbftPrepareMessage { block_hash: block_hash.clone() },
-            &keypair.secret,
-            0);
+            PbftPrepareMessage {
+                block_hash: block_hash.clone(),
+            },
+            &keypair.secret_key,
+            0,
+        );
         let commit = SignedPbftCommitMessage::from_message(
-            PbftCommitMessage { block_hash: block_hash.clone() },
-            &keypair.secret,
-            0);
+            PbftCommitMessage {
+                block_hash: block_hash.clone(),
+            },
+            &keypair.secret_key,
+            0,
+        );
 
         // create proof
         let mut pbft_proof = PbftProofBuilder::new();
-        pbft_proof.add_prepare_signature(&keypair.public, policy::SLOTS, &prepare);
-        pbft_proof.add_commit_signature(&keypair.public, policy::SLOTS, &commit);
+        pbft_proof.add_prepare_signature(&keypair.public_key, policy::SLOTS, &prepare);
+        pbft_proof.add_commit_signature(&keypair.public_key, policy::SLOTS, &commit);
 
         MacroBlock {
             header: proposal.header,
@@ -90,7 +118,9 @@ impl TemporaryBlockProducer {
     }
 
     fn create_view_change_proof(&self, view_number: u32) -> ViewChangeProof {
-        let keypair = KeyPair::from(SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap());
+        let keypair = KeyPair::from(
+            SecretKey::deserialize_from_vec(&hex::decode(SECRET_KEY).unwrap()).unwrap(),
+        );
 
         let view_change = ViewChange {
             block_number: self.blockchain.head_height() + 1,
@@ -99,14 +129,11 @@ impl TemporaryBlockProducer {
         };
 
         // create signed prepare and commit
-        let view_change = SignedViewChange::from_message(
-            view_change,
-            &keypair.secret,
-            0);
+        let view_change = SignedViewChange::from_message(view_change, &keypair.secret_key, 0);
 
         // create proof
         let mut view_change_proof = ViewChangeProofBuilder::new();
-        view_change_proof.add_signature(&keypair.public, policy::SLOTS, &view_change);
+        view_change_proof.add_signature(&keypair.public_key, policy::SLOTS, &view_change);
         view_change_proof.build()
     }
 }
@@ -230,7 +257,7 @@ fn it_cant_rebranch_across_epochs() {
     temp_producer2.push(ancestor.clone());
 
     let mut previous = ancestor;
-    for _ in 0 .. policy::EPOCH_LENGTH {
+    for _ in 0..policy::EPOCH_LENGTH {
         previous = temp_producer1.next_block(0, vec![]);
     }
 
