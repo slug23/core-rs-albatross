@@ -1,10 +1,13 @@
+use std::ops::Deref;
+
 use beserial::{Deserialize, Serialize};
-use block_albatross::{BlockExtrinsics, BlockHeader, BlockJustification};
+use bitflags::bitflags;
+use block_albatross::{
+    Block, BlockExtrinsics, BlockHeader, BlockJustification, MacroBlock, MicroBlock,
+};
 use hash::Blake2bHash;
 
-use bitflags::bitflags;
-
-use std::ops::Deref;
+use crate::Message;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[repr(u8)]
@@ -29,44 +32,61 @@ impl<T: Serialize + Deserialize> Objects<T> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Response<T: Serialize + Deserialize> {
-    response_msg: T,
+pub struct RequestResponse<T: Serialize + Deserialize> {
+    pub msg: T,
     request_identifier: u32,
 }
 
-impl<T: Serialize + Deserialize> Response<T> {
+impl<T: Serialize + Deserialize> RequestResponse<T> {
     pub fn new(msg: T, request_identifier: u32) -> Self {
-        Response {
-            response_msg: msg,
+        RequestResponse {
+            msg,
             request_identifier,
         }
     }
 
-    pub fn request_identifier(msg: &Response<T>) -> u32 {
+    pub fn request_identifier(msg: &RequestResponse<T>) -> u32 {
         msg.request_identifier
     }
 }
 
-impl<T: Serialize + Deserialize> Deref for Response<T> {
+impl<T: Serialize + Deserialize> Deref for RequestResponse<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.response_msg
+        &self.msg
     }
 }
 
-bitflags! {
-    #[derive(Default, Serialize, Deserialize)]
-    pub struct BlockComponentFlags: u8 {
-        const HEADER  = 0b0000_0001;
-        const JUSTIFICATION = 0b0000_0010;
-        const EXTRINSICS = 0b0000_0100;
-    }
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum RequestBlocksFilter {
+    All = 1,
+    MacroOnly = 2,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BlockComponents {
-    header: Option<BlockHeader>,
-    justification: Option<BlockJustification>,
-    extrinsics: Option<BlockExtrinsics>,
+pub struct RequestBlocksMessage {
+    #[beserial(len_type(u16, limit = 128))]
+    pub locators: Vec<Blake2bHash>,
+    pub max_blocks: u16,
+    pub filter: RequestBlocksFilter,
+}
+
+impl RequestBlocksMessage {
+    pub fn new(
+        locators: Vec<Blake2bHash>,
+        max_blocks: u16,
+        filter: RequestBlocksFilter,
+        request_identifier: u32,
+    ) -> Message {
+        Message::RequestBlocks(Box::new(RequestResponse::new(
+            Self {
+                locators,
+                max_blocks,
+                filter,
+            },
+            request_identifier,
+        )))
+    }
 }

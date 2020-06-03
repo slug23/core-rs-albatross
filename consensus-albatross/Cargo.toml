@@ -1,9 +1,9 @@
 [package]
-name = "nimiq-messages"
+name = "nimiq-consensus-albatross"
 version = "0.1.0"
 authors = ["The Nimiq Core Development Team <info@nimiq.com>"]
 edition = "2018"
-description = "Messages send over the nimiq network"
+description = "Consensus implementation of Nimiq in Rust"
 homepage = "https://nimiq.com"
 repository = "https://github.com/nimiq/core-rs-albatross"
 license = "Apache-2.0"
@@ -17,30 +17,27 @@ is-it-maintained-open-issues = { repository = "nimiq/core-rs" }
 maintenance = { status = "experimental" }
 
 [dependencies]
-bitflags = "1.0"
-bitvec = "0.17"
-byteorder = "1.2"
+failure = "0.1"
 futures = "0.1"
-hex = "0.4"
 log = "0.4"
 parking_lot = "0.9"
 rand = "0.7"
+tokio = "0.1"
+weak-table = "0.2"
 
 beserial = { path = "../beserial", version = "0.1" }
-beserial_derive = { path = "../beserial/beserial_derive", version = "0.1" }
-nimiq-account = { path = "../primitives/account", version = "0.1" }
-nimiq-block = { path = "../primitives/block", version = "0.1" }
 nimiq-block-albatross = { path = "../primitives/block-albatross", version = "0.1" }
 nimiq-block-base = { path = "../primitives/block-base", version = "0.1" }
-nimiq-bls = { path = "../bls" }
-nimiq-handel = { path = "../handel", version = "0.1" }
+nimiq-blockchain-albatross = { path = "../blockchain-albatross", version = "0.1", features = ["transaction-store"] }
+nimiq-blockchain-base = { path = "../blockchain-base", version = "0.1" }
+nimiq-collections = { path = "../collections", version = "0.1" }
+nimiq-database = { path = "../database", version = "0.1", features = ["full-nimiq"] }
 nimiq-hash = { path = "../hash", version = "0.1" }
-nimiq-keys = { path = "../keys", version = "0.1" }
 nimiq-macros = { path = "../macros", version = "0.1" }
-nimiq-network-primitives = { path = "../network-primitives", version = "0.1", features = ["networks", "subscription", "version"] }
+nimiq-mempool = { path = "../mempool", version = "0.1" }
+nimiq-messages = { path = "../messages", version = "0.1" }
+nimiq-network = { path = "../network", version = "0.1" }
+nimiq-network-primitives = { path = "../network-primitives", version = "0.1", features = ["networks", "time"] }
+nimiq-primitives = { path = "../primitives", version = "0.1", features = ["policy"] }
 nimiq-transaction = { path = "../primitives/transaction", version = "0.1" }
-nimiq-tree-primitives = { path = "../accounts/tree-primitives", version = "0.1" }
-nimiq-utils = { path = "../utils", version = "0.1", features = ["observer", "crc", "time"] }
-
-[dev-dependencies]
-nimiq-utils = { path = "../utils", version = "0.1", features = ["observer", "crc", "time", "iterators"] }
+nimiq-utils = { path = "../utils", version = "0.1", features = ["observer", "timers", "mutable-once", "throttled-queue", "rate-limit", "merkle", "math"] }

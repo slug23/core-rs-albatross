@@ -34,8 +34,8 @@ use bitflags::bitflags;
 use block::proof::ChainProof;
 use block::{Block, BlockHeader};
 use block_albatross::{
-    Block as BlockAlbatross, BlockHeader as BlockHeaderAlbatross, ForkProof, PbftCommitMessage,
-    PbftPrepareMessage, SignedPbftProposal, ViewChange, ViewChangeProof,
+    Block as BlockAlbatross, BlockComponents, BlockHeader as BlockHeaderAlbatross, ForkProof,
+    PbftCommitMessage, PbftPrepareMessage, SignedPbftProposal, ViewChange, ViewChangeProof,
 };
 use handel::update::LevelUpdateMessage;
 use hash::Blake2bHash;
@@ -57,10 +57,12 @@ use utils::observer::{PassThroughListener, PassThroughNotifier};
 
 mod albatross;
 mod common;
+mod distributor;
 mod pow;
 
 pub use albatross::*;
 pub use common::*;
+pub use distributor::*;
 pub use pow::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -200,7 +202,6 @@ pub enum Message {
     Block(Box<Block>),
     Header(Box<BlockHeader>),
     Tx(Box<TxMessage>),
-    GetBlocks(Box<GetBlocksMessage>),
     Reject(Box<RejectMessage>),
     Subscribe(Box<Subscription>),
 
@@ -210,6 +211,7 @@ pub enum Message {
     // Nimiq 1.0 and 2.0
     Version(Box<VersionMessage>),
 
+    GetBlocks(Box<GetBlocksMessage>),
     Mempool(/*request identifier*/ u32),
 
     Addr(Box<AddrMessage>),
@@ -252,14 +254,14 @@ pub enum Message {
     // TODO: Add request identifier
     GetEpochTransactions(Box<GetEpochTransactionsMessage>),
     EpochTransactions(Box<EpochTransactionsMessage>),
-    GetMacroBlocks(Box<GetBlocksMessage>),
 
     // New
+    RequestBlocks(Box<RequestResponse<RequestBlocksMessage>>),
     SubscribeAlbatross(Box<SubscriptionAlbatross>),
-    Transactions,
-    Blocks,
-    TransactionAnnouncement,
-    BlockAnnouncement,
+    Transactions(Box<RequestResponse<Objects<Transaction>>>),
+    Blocks(Box<RequestResponse<Objects<BlockComponents>>>),
+    TransactionAnnouncement(Box<Objects<Transaction>>),
+    BlockAnnouncement(Box<Objects<BlockComponents>>),
 }
 
 impl Message {
@@ -307,15 +309,15 @@ impl Message {
             Message::PbftProposal(_) => MessageType::PbftProposal,
             Message::PbftPrepare(_) => MessageType::PbftPrepare,
             Message::PbftCommit(_) => MessageType::PbftCommit,
-            Message::GetMacroBlocks(_) => MessageType::GetMacroBlocks,
+            Message::RequestBlocks(_) => MessageType::GetMacroBlocks,
             Message::GetEpochTransactions(_) => MessageType::GetEpochTransactions,
             Message::EpochTransactions(_) => MessageType::EpochTransactions,
 
             Message::SubscribeAlbatross(_) => MessageType::SubscribeAlbatross,
-            Message::Transactions => MessageType::Transactions,
-            Message::Blocks => MessageType::Blocks,
-            Message::TransactionAnnouncement => MessageType::TransactionAnnouncement,
-            Message::BlockAnnouncement => MessageType::BlockAnnouncement,
+            Message::Transactions(_) => MessageType::Transactions,
+            Message::Blocks(_) => MessageType::Blocks,
+            Message::TransactionAnnouncement(_) => MessageType::TransactionAnnouncement,
+            Message::BlockAnnouncement(_) => MessageType::BlockAnnouncement,
         }
     }
 
@@ -508,7 +510,7 @@ impl Deserialize for Message {
                 Message::PbftCommit(Deserialize::deserialize(&mut crc32_reader)?)
             }
             MessageType::GetMacroBlocks => {
-                Message::GetMacroBlocks(Deserialize::deserialize(&mut crc32_reader)?)
+                Message::RequestBlocks(Deserialize::deserialize(&mut crc32_reader)?)
             }
             MessageType::GetEpochTransactions => {
                 Message::GetEpochTransactions(Deserialize::deserialize(&mut crc32_reader)?)
@@ -520,10 +522,16 @@ impl Deserialize for Message {
             MessageType::SubscribeAlbatross => {
                 Message::SubscribeAlbatross(Deserialize::deserialize(&mut crc32_reader)?)
             }
-            MessageType::Transactions => Message::Transactions,
-            MessageType::Blocks => Message::Blocks,
-            MessageType::TransactionAnnouncement => Message::TransactionAnnouncement,
-            MessageType::BlockAnnouncement => Message::BlockAnnouncement,
+            MessageType::Transactions => {
+                Message::Transactions(Deserialize::deserialize(&mut crc32_reader)?)
+            }
+            MessageType::Blocks => Message::Blocks(Deserialize::deserialize(&mut crc32_reader)?),
+            MessageType::TransactionAnnouncement => {
+                Message::TransactionAnnouncement(Deserialize::deserialize(&mut crc32_reader)?)
+            }
+            MessageType::BlockAnnouncement => {
+                Message::BlockAnnouncement(Deserialize::deserialize(&mut crc32_reader)?)
+            }
         };
 
         // XXX Consume any leftover bytes in the message before computing the checksum.
@@ -607,7 +615,7 @@ impl Serialize for Message {
             Message::PbftProposal(pbft_proposal) => pbft_proposal.serialize(&mut v)?,
             Message::PbftPrepare(pbft_prepare) => pbft_prepare.serialize(&mut v)?,
             Message::PbftCommit(pbft_commit) => pbft_commit.serialize(&mut v)?,
-            Message::GetMacroBlocks(get_blocks_message) => get_blocks_message.serialize(&mut v)?,
+            Message::RequestBlocks(get_blocks_message) => get_blocks_message.serialize(&mut v)?,
             Message::GetEpochTransactions(get_epoch_transactions) => {
                 get_epoch_transactions.serialize(&mut v)?
             }
@@ -618,10 +626,10 @@ impl Serialize for Message {
             Message::SubscribeAlbatross(subscription_message) => {
                 subscription_message.serialize(&mut v)?
             }
-            Message::Transactions => 0,
-            Message::Blocks => 0,
-            Message::TransactionAnnouncement => 0,
-            Message::BlockAnnouncement => 0,
+            Message::Transactions(msg) => msg.serialize(&mut v)?,
+            Message::Blocks(msg) => msg.serialize(&mut v)?,
+            Message::TransactionAnnouncement(msg) => msg.serialize(&mut v)?,
+            Message::BlockAnnouncement(msg) => msg.serialize(&mut v)?,
         };
 
         // write checksum to placeholder
@@ -691,7 +699,7 @@ impl Serialize for Message {
             Message::PbftProposal(pbft_proposal) => pbft_proposal.serialized_size(),
             Message::PbftPrepare(pbft_prepare) => pbft_prepare.serialized_size(),
             Message::PbftCommit(pbft_commit) => pbft_commit.serialized_size(),
-            Message::GetMacroBlocks(get_blocks_message) => get_blocks_message.serialized_size(),
+            Message::RequestBlocks(get_blocks_message) => get_blocks_message.serialized_size(),
             Message::GetEpochTransactions(get_epoch_transactions) => {
                 get_epoch_transactions.serialized_size()
             }
@@ -699,10 +707,10 @@ impl Serialize for Message {
             Message::SubscribeAlbatross(subscription_message) => {
                 subscription_message.serialized_size()
             }
-            Message::Transactions => 0,
-            Message::Blocks => 0,
-            Message::TransactionAnnouncement => 0,
-            Message::BlockAnnouncement => 0,
+            Message::Transactions(msg) => msg.serialized_size(),
+            Message::Blocks(msg) => msg.serialized_size(),
+            Message::TransactionAnnouncement(msg) => msg.serialized_size(),
+            Message::BlockAnnouncement(msg) => msg.serialized_size(),
         };
         size
     }
@@ -753,9 +761,11 @@ pub struct MessageNotifier {
     pub pbft_proposal: RwLock<PassThroughNotifier<'static, SignedPbftProposal>>,
     pub pbft_prepare: RwLock<PassThroughNotifier<'static, LevelUpdateMessage<PbftPrepareMessage>>>,
     pub pbft_commit: RwLock<PassThroughNotifier<'static, LevelUpdateMessage<PbftCommitMessage>>>,
-    pub get_macro_blocks: RwLock<PassThroughNotifier<'static, GetBlocksMessage>>,
     pub get_epoch_transactions: RwLock<PassThroughNotifier<'static, GetEpochTransactionsMessage>>,
     pub epoch_transactions: RwLock<PassThroughNotifier<'static, EpochTransactionsMessage>>,
+
+    pub bypass_notifier: RwLock<PassThroughNotifier<'static, Message>>,
+    pub bypass: bool,
 }
 
 impl MessageNotifier {
@@ -763,7 +773,18 @@ impl MessageNotifier {
         Self::default()
     }
 
+    pub fn new_bypass() -> Self {
+        let mut msg_notifier = Self::default();
+        msg_notifier.bypass = true;
+        msg_notifier
+    }
+
     pub fn notify(&self, msg: Message) {
+        if self.bypass {
+            self.bypass_notifier.read().notify(msg);
+            return;
+        }
+
         match msg {
             Message::Version(msg) => self.version.read().notify(*msg),
             Message::VerAck(msg) => self.ver_ack.read().notify(*msg),
@@ -813,15 +834,10 @@ impl MessageNotifier {
             Message::PbftProposal(proposal) => self.pbft_proposal.read().notify(*proposal),
             Message::PbftPrepare(prepare) => self.pbft_prepare.read().notify(*prepare),
             Message::PbftCommit(commit) => self.pbft_commit.read().notify(*commit),
-            Message::GetMacroBlocks(msg) => self.get_macro_blocks.read().notify(*msg),
             Message::GetEpochTransactions(msg) => self.get_epoch_transactions.read().notify(*msg),
             Message::EpochTransactions(msg) => self.epoch_transactions.read().notify(*msg),
-            // TODO
-            Message::SubscribeAlbatross(_) => {}
-            Message::Transactions => {}
-            Message::Blocks => {}
-            Message::TransactionAnnouncement => {}
-            Message::BlockAnnouncement => {}
+
+            _ => {}
         }
     }
 }
@@ -1012,48 +1028,6 @@ impl TxMessage {
         Message::Tx(Box::new(Self {
             transaction,
             accounts_proof: None,
-        }))
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum GetBlocksDirection {
-    Forward = 1,
-    Backward = 2,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GetBlocksMessage {
-    #[beserial(len_type(u16))]
-    pub locators: Vec<Blake2bHash>,
-    pub max_inv_size: u16,
-    pub direction: GetBlocksDirection,
-}
-impl GetBlocksMessage {
-    pub const LOCATORS_MAX_COUNT: usize = 128;
-
-    pub fn new(
-        locators: Vec<Blake2bHash>,
-        max_inv_size: u16,
-        direction: GetBlocksDirection,
-    ) -> Message {
-        Message::GetBlocks(Box::new(Self {
-            locators,
-            max_inv_size,
-            direction,
-        }))
-    }
-
-    pub fn new_with_macro(
-        locators: Vec<Blake2bHash>,
-        max_inv_size: u16,
-        direction: GetBlocksDirection,
-    ) -> Message {
-        Message::GetMacroBlocks(Box::new(Self {
-            locators,
-            max_inv_size,
-            direction,
         }))
     }
 }

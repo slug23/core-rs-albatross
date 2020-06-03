@@ -28,6 +28,16 @@ pub struct Subscription {
     pub block_announcements: SubscriptionType,
 }
 
+impl Default for Subscription {
+    fn default() -> Self {
+        Subscription {
+            tx_announcements: SubscriptionType::None,
+            tx_filter: None,
+            block_announcements: SubscriptionType::None,
+        }
+    }
+}
+
 impl Subscription {
     pub fn matches_block(&self) -> bool {
         match self.block_announcements {

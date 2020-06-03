@@ -29,6 +29,7 @@ members = [
     "mempool",
     "network-primitives",
     "consensus",
+    "consensus-albatross",
     "network",
     "client",
     "rpc-server",
