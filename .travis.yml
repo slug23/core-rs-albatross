@@ -42,7 +42,7 @@ before_script:
 
 script:
   - if [ -z ${NO_CLIPPY+x} ]; then cargo clippy --all-features; fi
-  - cargo test --verbose --all
+  - cargo test --all
 
 # Don't cache registry as it accumulates dead weight as dependencies are updated
 # Also downloading this from crates.io is probably faster as downloading from travis cache
