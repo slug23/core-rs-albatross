@@ -1,20 +1,18 @@
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-use beserial::Serialize;
-use block_albatross::BlockComponents;
+use block_albatross::{Block, BlockComponents};
 use hash::Blake2bHash;
 use network::Peer;
 use network_messages::{
-    Message, MessageDistributor, MessageType, Objects, RequestBlocksFilter, RequestBlocksMessage,
-    RequestResponse,
+    Message, Objects, RequestBlocksFilter, RequestBlocksMessage, RequestResponse,
 };
 use network_primitives::subscription_albatross::Subscription;
+use transaction::Transaction;
 use utils::mutable_once::MutableOnce;
 use utils::observer::weak_passthru_listener;
-use utils::rate_limit::RateLimit;
 use utils::timers::Timers;
 
 use crate::consensus_agent::response_future::Response;
@@ -28,6 +26,7 @@ pub struct ConsensusAgentState {
     block_responses: HashMap<u32, Response<Objects<BlockComponents>>>,
 
     local_subscription: Subscription,
+    remote_subscription: Subscription,
 }
 
 impl ConsensusAgentState {
@@ -51,7 +50,6 @@ pub struct ConsensusAgent {
     pub(crate) state: RwLock<ConsensusAgentState>,
 
     timers: Timers<ConsensusAgentTimer>,
-    msg_distributor: Mutex<MessageDistributor>,
     self_weak: MutableOnce<Weak<ConsensusAgent>>,
 }
 
@@ -63,9 +61,9 @@ impl ConsensusAgent {
                 current_request_identifier: 0,
                 block_responses: Default::default(),
                 local_subscription: Default::default(),
+                remote_subscription: Default::default(),
             }),
             timers: Timers::new(),
-            msg_distributor: Default::default(),
             self_weak: MutableOnce::new(Weak::new()),
         });
         ConsensusAgent::init_listeners(&agent);
@@ -85,10 +83,26 @@ impl ConsensusAgent {
             }));
     }
 
+    pub fn relay_block(&self, block: &Block) -> bool {
+        unimplemented!()
+    }
+
+    pub fn relay_transaction(&self, transaction: &Transaction) -> bool {
+        unimplemented!()
+    }
+
+    pub fn remove_transaction(&self, transaction: &Transaction) {
+        unimplemented!()
+    }
+
+    pub fn synced(&self) -> bool {
+        unimplemented!()
+    }
+
     fn on_message(&self, msg: Message) {
         match msg {
             Message::Blocks(blocks) => self.on_blocks(blocks),
-            msg => self.msg_distributor.lock().notify_and_cleanup(msg),
+            msg => {}
         }
     }
 

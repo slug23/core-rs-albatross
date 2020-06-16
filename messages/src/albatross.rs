@@ -1,10 +1,6 @@
 use std::ops::Deref;
 
 use beserial::{Deserialize, Serialize};
-use bitflags::bitflags;
-use block_albatross::{
-    Block, BlockExtrinsics, BlockHeader, BlockJustification, MacroBlock, MicroBlock,
-};
 use hash::Blake2bHash;
 
 use crate::Message;

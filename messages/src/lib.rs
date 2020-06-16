@@ -765,7 +765,7 @@ pub struct MessageNotifier {
     pub epoch_transactions: RwLock<PassThroughNotifier<'static, EpochTransactionsMessage>>,
 
     pub bypass_notifier: RwLock<PassThroughNotifier<'static, Message>>,
-    pub bypass: bool,
+    pub consensus_bypass: bool,
 }
 
 impl MessageNotifier {
@@ -773,16 +773,27 @@ impl MessageNotifier {
         Self::default()
     }
 
-    pub fn new_bypass() -> Self {
+    pub fn with_consensus_bypass() -> Self {
         let mut msg_notifier = Self::default();
-        msg_notifier.bypass = true;
+        msg_notifier.consensus_bypass = true;
         msg_notifier
     }
 
     pub fn notify(&self, msg: Message) {
-        if self.bypass {
-            self.bypass_notifier.read().notify(msg);
-            return;
+        if self.consensus_bypass {
+            match msg.ty() {
+                MessageType::Version
+                | MessageType::VerAck
+                | MessageType::Addr
+                | MessageType::GetAddr
+                | MessageType::Ping
+                | MessageType::Pong
+                | MessageType::Signal => {}
+                _ => {
+                    self.bypass_notifier.read().notify(msg);
+                    return;
+                }
+            }
         }
 
         match msg {

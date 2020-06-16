@@ -17,4 +17,7 @@ extern crate nimiq_primitives as primitives;
 extern crate nimiq_transaction as transaction;
 extern crate nimiq_utils as utils;
 
+pub mod consensus;
 pub mod consensus_agent;
+pub mod error;
+pub mod sync;
