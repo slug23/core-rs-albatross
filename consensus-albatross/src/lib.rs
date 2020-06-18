@@ -21,3 +21,7 @@ pub mod consensus;
 pub mod consensus_agent;
 pub mod error;
 pub mod sync;
+
+pub use consensus::{Consensus, ConsensusEvent};
+pub use error::Error;
+pub use sync::SyncProtocol;

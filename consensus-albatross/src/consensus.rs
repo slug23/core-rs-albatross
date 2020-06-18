@@ -26,7 +26,7 @@ use crate::error::{Error, SyncError};
 use crate::sync::SyncProtocol;
 use futures::Future;
 
-pub struct Consensus<S: SyncProtocol> {
+pub struct Consensus {
     pub blockchain: Arc<Blockchain>,
     pub mempool: Arc<Mempool<Blockchain>>,
     pub network: Arc<Network<Blockchain>>,
@@ -36,10 +36,10 @@ pub struct Consensus<S: SyncProtocol> {
 
     pub(crate) state: RwLock<ConsensusState>,
 
-    self_weak: MutableOnce<Weak<Consensus<S>>>,
+    self_weak: MutableOnce<Weak<Consensus>>,
     pub notifier: RwLock<Notifier<'static, ConsensusEvent>>,
 
-    sync_protocol: S,
+    sync_protocol: Box<dyn SyncProtocol>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -62,11 +62,11 @@ pub(crate) struct ConsensusState {
     pub(crate) agents: ConsensusAgentMap,
 }
 
-impl<S: SyncProtocol> Consensus<S> {
+impl Consensus {
     pub const MIN_FULL_NODES: usize = 0;
     const SYNC_THROTTLE: Duration = Duration::from_millis(1500);
 
-    pub fn new(
+    pub fn new<S: SyncProtocol>(
         env: Environment,
         network_id: NetworkId,
         network_config: NetworkConfig,
@@ -97,13 +97,13 @@ impl<S: SyncProtocol> Consensus<S> {
 
             self_weak: MutableOnce::new(Weak::new()),
             notifier: RwLock::new(Notifier::new()),
-            sync_protocol,
+            sync_protocol: Box::new(sync_protocol),
         });
         Consensus::init_listeners(&this);
         Ok(this)
     }
 
-    pub fn init_listeners(this: &Arc<Consensus<S>>) {
+    pub fn init_listeners(this: &Arc<Consensus>) {
         unsafe { this.self_weak.replace(Arc::downgrade(this)) };
 
         let weak = Arc::downgrade(this);

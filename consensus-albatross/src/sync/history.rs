@@ -15,11 +15,13 @@ use blockchain_base::AbstractBlockchain;
 use network::Peer;
 use network_messages::{Objects, RequestBlocksFilter};
 
+#[derive(Default)]
 pub struct HistorySyncState {
     sync_peer: Option<Arc<Peer>>,
     established: bool,
 }
 
+#[derive(Default)]
 pub struct HistorySync {
     state: RwLock<HistorySyncState>,
 }
@@ -27,7 +29,7 @@ pub struct HistorySync {
 impl HistorySync {
     fn sync_with_peer(
         &self,
-        consensus: Arc<Consensus<Self>>,
+        consensus: Arc<Consensus>,
         agent: Arc<ConsensusAgent>,
     ) -> Box<dyn Future<Item = (), Error = SyncError> + 'static + Send> {
         let locators = consensus.blockchain.get_block_locators(100);
@@ -53,7 +55,7 @@ impl HistorySync {
 impl SyncProtocol for HistorySync {
     fn perform_sync(
         &self,
-        consensus: Arc<Consensus<Self>>,
+        consensus: Arc<Consensus>,
     ) -> Box<dyn Future<Item = (), Error = SyncError> + 'static + Send> {
         let mut state = self.state.write();
         // Wait for ongoing sync to finish.
@@ -81,7 +83,7 @@ impl SyncProtocol for HistorySync {
         drop(consensus_state);
 
         // Report consensus-lost if we are synced with less than the minimum number of full nodes.
-        if state.established && num_synced_full_nodes < Consensus::<Self>::MIN_FULL_NODES {
+        if state.established && num_synced_full_nodes < Consensus::MIN_FULL_NODES {
             state.established = false;
             info!("Consensus lost");
             // FIXME we're still holding state write lock when notifying here.
@@ -104,7 +106,7 @@ impl SyncProtocol for HistorySync {
         } else {
             // We are synced with all connected peers.
             // Report consensus-established if we are connected to the minimum number of full nodes.
-            if num_synced_full_nodes >= Consensus::<Self>::MIN_FULL_NODES {
+            if num_synced_full_nodes >= Consensus::MIN_FULL_NODES {
                 if !state.established {
                     info!(
                         "Synced with all connected peers ({}), consensus established",
