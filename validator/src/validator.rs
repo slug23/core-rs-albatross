@@ -86,6 +86,7 @@ pub struct Validator {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum ValidatorTimer {
+    SendTransaction,
     ViewChange,
 }
 
@@ -300,7 +301,11 @@ impl Validator {
                 proof_builder.sign_with_key_pair(validator_wallet_key);
                 let transaction = proof_builder.generate().unwrap();
 
-                self.consensus.mempool.push_transaction(transaction.clone());
+                let weak = self.self_weak.clone();
+                self.timers.set_delay(ValidatorTimer::SendTransaction, move || {
+                    let this = upgrade_weak!(weak);
+                    this.consensus.mempool.push_transaction(transaction.clone());
+                }, Duration::default());
             }
         }
     }
