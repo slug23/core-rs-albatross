@@ -51,7 +51,7 @@ lazy_static! {
 
 const SUPPLY_CACHE_INTERVAL: u32 = 5000;
 
-fn supply_after(block_height: u32) -> u64 {
+pub fn supply_after(block_height: u32) -> u64 {
     let end_i = block_height / SUPPLY_CACHE_INTERVAL;
     let start_i;
     let mut supply;

@@ -42,6 +42,10 @@ impl BlockchainAlbatrossHandler {
     pub(crate) fn epoch_number(&self, _params: &[JsonValue]) -> Result<JsonValue, JsonValue> {
         Ok(policy::epoch_at(self.blockchain.height()).into())
     }
+    pub(crate) fn supply_after(&self, params: &[JsonValue]) -> Result<JsonValue, JsonValue> {
+        let block_number = self.generic.parse_block_number(params.get(0).unwrap_or(&Null))?;
+        Ok(policy::supply_after(block_number).into())
+    }
 
     /// Returns a block object for a block hash.
     /// Parameters:
@@ -508,6 +512,7 @@ impl Module for BlockchainAlbatrossHandler {
         "getBlockTransactionCountByHash" => generic.get_block_transaction_count_by_hash,
         "getBlockTransactionCountByNumber" => generic.get_block_transaction_count_by_number,
         "slotState" => slot_state,
+        "supplyAfter" => supply_after,
 
         // Accounts
         "getBalance" => generic.get_balance,
