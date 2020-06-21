@@ -479,7 +479,7 @@ impl<B: AbstractBlockchain + 'static> Mempool<B> {
 
         // Notify listeners.
         for tx in txs_mined {
-            trace!("Transaction minded: {:?}", tx);
+            trace!("Transaction mined: {:?}", tx);
             self.notifier.read().notify(MempoolEvent::TransactionMined(tx));
         }
 
