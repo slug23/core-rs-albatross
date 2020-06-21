@@ -27,6 +27,7 @@ use utils::unique_id::UniqueId;
 use consensus::{Consensus, AlbatrossConsensusProtocol};
 use blockchain_base::AbstractBlockchain;
 use blockchain_albatross::blockchain::BlockchainEvent;
+use nimiq_mempool::MempoolEvent;
 use hash::{Hash, Blake2bHash};
 #[cfg(feature="validator")]
 use validator::validator_network::ValidatorNetworkEvent;
@@ -170,6 +171,49 @@ impl WsRpcServer {
                 }
             }
         });
+    }
+
+    pub fn register_mempool(&self, consensus: Arc<Consensus<AlbatrossConsensusProtocol>>) {
+        let connections_listener = Arc::clone(&self.connections);
+
+        consensus.mempool.notifier.write().register(move |event: &MempoolEvent| {
+            if !connections_listener.read().is_empty() {
+                if let Some(message) = Self::map_mempool_event(event) {
+                    Self::broadcast_message(&connections_listener, message)
+                }
+            }
+        });
+    }
+
+    /*
+    pub enum MempoolEvent {
+            TransactionAdded(Blake2bHash, Arc<Transaction>),
+                TransactionRestored(Arc<Transaction>),
+                    TransactionMined(Arc<Transaction>),
+                        TransactionEvicted(Arc<Transaction>),
+    }
+    */
+
+    fn map_mempool_event(event: &MempoolEvent) -> Option<JsonValue> {
+        Some(match event {
+            MempoolEvent::TransactionAdded(tx_hash, tx) => object!{
+                "eventType" => "mempoolTransactionAdded",
+                "blockHash" => tx_hash.to_string(),
+            },
+            MempoolEvent::TransactionRestored(tx) => object!{
+                "eventType" => "mempoolTransactionRestored",
+                "blockHash" => "slug-UNIMPLEMENTED",
+            },
+            MempoolEvent::TransactionMined(tx) => object!{
+                "eventType" => "mempoolTransactionMined",
+                "blockHash" => "slug-UNIMPLEMENTED",
+            },
+            MempoolEvent::TransactionEvicted(tx) => object!{
+                "eventType" => "mempoolTransactionEvicted",
+                "blockHash" => "slug-UNIMPLEMENTED",
+            },
+        })
+
     }
 
     fn map_blockchain_event(event: &BlockchainEvent) -> Option<JsonValue> {

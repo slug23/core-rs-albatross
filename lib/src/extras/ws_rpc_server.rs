@@ -12,6 +12,7 @@ pub fn initialize_ws_rcp_server(client: &Client, config: WsRpcServerConfig) -> R
 
     let server = WsRpcServer::new(ip, config.port)?;
     server.register_blockchain(client.consensus());
+    server.register_mempool(client.consensus());
     #[cfg(feature="validator")] {
         if let Some(validator) = client.validator() {
             server.register_validator(validator)
