@@ -198,7 +198,7 @@ impl WsRpcServer {
         Some(match event {
             MempoolEvent::TransactionAdded(tx_hash, tx) => object!{
                 "eventType" => "mempoolTransactionAdded",
-                "blockHash" => tx_hash.to_string(),
+                "txHash" => tx_hash.to_string(),
             },
             MempoolEvent::TransactionRestored(tx) => object!{
                 "eventType" => "mempoolTransactionRestored",
