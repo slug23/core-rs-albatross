@@ -6,6 +6,7 @@ extern crate nimiq_utils as utils;
 extern crate nimiq_blockchain_albatross as blockchain_albatross;
 extern crate nimiq_blockchain_base as blockchain_base;
 extern crate nimiq_hash as hash;
+extern crate nimiq_rpc_server as rpc_server;
 #[cfg(feature="validator")]
 extern crate nimiq_validator as validator;
 
@@ -27,6 +28,7 @@ use utils::unique_id::UniqueId;
 use consensus::{Consensus, AlbatrossConsensusProtocol};
 use blockchain_base::AbstractBlockchain;
 use blockchain_albatross::blockchain::BlockchainEvent;
+use nimiq_rpc_server::handlers::mempool::transaction_to_obj;
 use nimiq_mempool::MempoolEvent;
 use hash::{Hash, Blake2bHash};
 #[cfg(feature="validator")]
@@ -199,18 +201,19 @@ impl WsRpcServer {
             MempoolEvent::TransactionAdded(tx_hash, tx) => object!{
                 "eventType" => "mempoolTransactionAdded",
                 "txHash" => tx_hash.to_string(),
+                "tx" => transaction_to_obj(tx, None, None)
             },
             MempoolEvent::TransactionRestored(tx) => object!{
                 "eventType" => "mempoolTransactionRestored",
-                "blockHash" => "slug-UNIMPLEMENTED",
+                "tx" => transaction_to_obj(tx, None, None)
             },
             MempoolEvent::TransactionMined(tx) => object!{
                 "eventType" => "mempoolTransactionMined",
-                "blockHash" => "slug-UNIMPLEMENTED",
+                "tx" => transaction_to_obj(tx, None, None)
             },
             MempoolEvent::TransactionEvicted(tx) => object!{
                 "eventType" => "mempoolTransactionEvicted",
-                "blockHash" => "slug-UNIMPLEMENTED",
+                "tx" => transaction_to_obj(tx, None, None)
             },
         })
 

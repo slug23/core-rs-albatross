@@ -34,6 +34,6 @@ nimiq-hash = { path = "../hash", version = "0.1" }
 nimiq-mempool = { path = "../mempool", version = "0.1" }
 nimiq-utils = { path = "../utils", version = "0.1", features = ["unique-id"] }
 nimiq-validator = { path = "../validator", version = "0.1", optional = true }
-
+nimiq-rpc-server = { path = "../rpc-server", version = "0.1"}
 [features]
 validator = ["nimiq-validator"]

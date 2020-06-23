@@ -226,7 +226,7 @@ impl<P: ConsensusProtocol + 'static> MempoolHandler<P> {
     }
 }
 
-pub(crate) fn transaction_to_obj(transaction: &Transaction, context: Option<&TransactionContext>, head_height: Option<u32>) -> JsonValue {
+pub fn transaction_to_obj(transaction: &Transaction, context: Option<&TransactionContext>, head_height: Option<u32>) -> JsonValue {
     object! {
         "hash" => transaction.hash::<Blake2bHash>().to_hex(),
         "blockHash" => context.map(|c| c.block_hash.into()).unwrap_or(Null),
@@ -315,7 +315,7 @@ pub(crate) fn obj_to_transaction(obj: &JsonValue, current_height: u32, network_i
     }
 }
 
-pub(crate) struct TransactionContext<'a> {
+pub struct TransactionContext<'a> {
     pub block_hash: &'a str,
     pub block_number: u32,
     pub index: u16,
