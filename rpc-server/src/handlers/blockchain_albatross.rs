@@ -5,6 +5,7 @@ use std::sync::Arc;
 use json::{JsonValue, Null, object};
 
 use account::Account;
+use nimiq_accounts::Accounts;
 use account::staking_contract::{InactiveStake, InactiveValidator, Validator};
 use block_albatross::{Block, ForkProof, signed};
 use blockchain_albatross::Blockchain;
@@ -335,6 +336,38 @@ impl BlockchainAlbatrossHandler {
             "inactiveStakes" => inactive_stakes,
         })
     }
+    pub(crate) fn get_accounts_tree(&self, _params: &[JsonValue]) -> Result<JsonValue, JsonValue> {
+        let chunk = self.blockchain.state.read().accounts.get_chunk("", 1000, None).unwrap(); 
+        let result: Vec<JsonValue> = chunk.terminal_nodes().iter()
+            .map(|(node)| {
+                let address = node.prefix().to_address().unwrap();
+                let account = self.blockchain.get_account(&address);
+                object!{
+                    "address" => JsonValue::from(address.to_user_friendly_address()),
+                    "balance" => JsonValue::from(u64::from(account.balance()))
+                }
+            })
+            .collect();
+        Ok(object! {
+            "accounts" => result
+        })
+    }
+
+    pub(crate) fn get_genesis_accounts(&self, _params: &[JsonValue]) -> Result<JsonValue, JsonValue> {
+        let network_info = NetworkInfo::from_network_id(self.blockchain.network_id);
+        let genesis_accounts = network_info.genesis_accounts();
+
+        let addresses: Vec<JsonValue> = genesis_accounts.iter()
+            .map(|(address, account)| object!{
+                    "address" => JsonValue::from(address.to_user_friendly_address()),
+                    "balance" => JsonValue::from(u64::from(account.balance()))
+            })
+            .collect();
+
+        Ok(object! {
+            "genesis_accounts" => addresses
+        })
+    }
 
     // Helper functions
 
@@ -516,6 +549,8 @@ impl Module for BlockchainAlbatrossHandler {
 
         // Accounts
         "getBalance" => generic.get_balance,
+        "getAccountsTree" => get_accounts_tree,
+        "getGenesisAccounts" => get_genesis_accounts,
         "listStakes" => list_stakes,
     }
 }
